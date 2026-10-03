@@ -134,12 +134,18 @@ def load_debug_rollout_data(path_template, *, rollout_id: int, subsample_ratio=N
 
 
 def save_debug_rollout_data(
-    path_template, data, *, rollout_id: int, evaluation: bool, args=None, reference=None
+    path_template, data, *, rollout_id: int, evaluation: bool, evaluation_phase: str | None = None, args=None, reference=None
 ) -> None:
+    """Save samples; an explicit {evaluation_phase} field separates paired evals."""
     if path_template is None:
         return
 
-    path = Path(path_template.format(rollout_id=("eval_" if evaluation else "") + str(rollout_id)))
+    path = Path(
+        path_template.format(
+            rollout_id=("eval_" if evaluation else "") + str(rollout_id),
+            evaluation_phase=evaluation_phase or "",
+        )
+    )
     logger.info(f"Save debug rollout data to {path}")
     path.parent.mkdir(parents=True, exist_ok=True)
 

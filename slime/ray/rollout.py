@@ -220,7 +220,7 @@ class RolloutManager:
         data = self.batch_builder.convert(data)
         return self.batch_builder.split_by_dp(data)
 
-    def eval(self, rollout_id):
+    def eval(self, rollout_id, *, evaluation_phase: str | None = None):
         if self.args.debug_train_only:
             # if debug train only, we don't generate evaluation data
             return
@@ -234,6 +234,7 @@ class RolloutManager:
             data,
             rollout_id=rollout_id,
             evaluation=True,
+            evaluation_phase=evaluation_phase,
             args=self.args,
         )
         log_eval_rollout_data(rollout_id, self.args, data, result.metrics)

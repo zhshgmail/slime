@@ -35,7 +35,7 @@ def train(args, restore_plan=None):
 
     # special case for eval-only
     if args.num_rollout == 0 and args.eval_interval is not None:
-        ray.get(rollout_manager.eval.remote(rollout_id=0))
+        ray.get(rollout_manager.eval.remote(rollout_id=0, evaluation_phase="eval_only"))
 
     def offload_train(actor_trains_this_step):
         # Each model auto-offloads after train() when offload_train is set,
@@ -49,7 +49,7 @@ def train(args, restore_plan=None):
     # train loop.
     for rollout_id in range(args.start_rollout_id, args.num_rollout):
         if args.eval_interval is not None and rollout_id == 0 and not args.skip_eval_before_train:
-            ray.get(rollout_manager.eval.remote(rollout_id))
+            ray.get(rollout_manager.eval.remote(rollout_id, evaluation_phase="pre"))
 
         rollout_data_ref = ray.get(rollout_manager.generate.remote(rollout_id))
 
@@ -100,7 +100,7 @@ def train(args, restore_plan=None):
             ray.get(rollout_manager.onload_kv.remote())
 
         if should_run_periodic_action(rollout_id, args.eval_interval, num_rollout_per_epoch):
-            ray.get(rollout_manager.eval.remote(rollout_id))
+            ray.get(rollout_manager.eval.remote(rollout_id, evaluation_phase="post"))
 
     ray.get(rollout_manager.dispose.remote())
     finish_tracking(args)

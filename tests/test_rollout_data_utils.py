@@ -119,5 +119,31 @@ def test_save_debug_eval_rollout_data_flattens_datasets(tmp_path):
     assert [sample["index"] for sample in saved["samples"]] == [1, 2]
 
 
+def test_paired_eval_debug_files_preserve_both_samples(tmp_path):
+    path_template = str(tmp_path / "rollout_{evaluation_phase}_{rollout_id}.pt")
+    for phase in ("pre", "post"):
+        data = {
+            "controlled": {
+                "samples": [Sample(index=0, rollout_id=0, metadata={"controlled_phase": phase})],
+            }
+        }
+        save_debug_rollout_data(
+            path_template, data, rollout_id=0, evaluation=True, evaluation_phase=phase
+        )
+
+    assert sorted(path.name for path in tmp_path.glob("*.pt")) == [
+        "rollout_post_eval_0.pt",
+        "rollout_pre_eval_0.pt",
+    ]
+    for phase in ("pre", "post"):
+        path = tmp_path / f"rollout_{phase}_eval_0.pt"
+        saved = torch.load(path, weights_only=False)
+        assert saved["rollout_id"] == 0
+        loaded = load_debug_rollout_data(str(path), rollout_id=0)
+        assert len(loaded) == 1
+        assert loaded[0].rollout_id == 0
+        assert loaded[0].metadata == {"controlled_phase": phase}
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
