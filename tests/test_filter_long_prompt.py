@@ -13,12 +13,13 @@ text-only prompt before any prompt carrying an image.
 
 from __future__ import annotations
 
+import json
 import sys
 import types
 
 import pytest
 
-from slime.utils.data import filter_long_prompt
+from slime.utils.data import Dataset, filter_long_prompt
 from slime.utils.types import Sample
 
 
@@ -110,6 +111,45 @@ def test_no_processor_path_still_preserves_order():
     kept = filter_long_prompt(samples, _Tokenizer(), None, max_length=100)
 
     assert [s.prompt for s in kept] == ["p0:5", "p2:5"]
+
+
+@pytest.mark.unit
+def test_dataset_filter_receives_extracted_image_after_chat_template(tmp_path):
+    from PIL import Image
+
+    image_path = tmp_path / "image.png"
+    Image.new("RGB", (1, 1), (255, 0, 0)).save(image_path)
+    dataset_path = tmp_path / "data.jsonl"
+    dataset_path.write_text(
+        json.dumps({"text": "<image>Describe this image.", "images": [str(image_path)]}) + "\n",
+        encoding="utf-8",
+    )
+    processed_images = []
+
+    class ChatTokenizer:
+        def apply_chat_template(self, messages, **kwargs):
+            return "rendered image prompt"
+
+    class ImageProcessor:
+        image_processor = types.SimpleNamespace(patch_size=16)
+
+        def __call__(self, *, text, images, videos):
+            assert text == "rendered image prompt" and videos is None
+            assert len(images) == 1 and isinstance(images[0], Image.Image)
+            processed_images.append(images[0])
+            return {"input_ids": [[1]]}
+
+    dataset = Dataset(
+        str(dataset_path),
+        tokenizer=ChatTokenizer(),
+        processor=ImageProcessor(),
+        max_length=1,
+        multimodal_keys={"image": "images"},
+        apply_chat_template=True,
+    )
+
+    assert processed_images[0] is dataset[0].multimodal_inputs["images"][0]
+    assert processed_images[0].getpixel((0, 0)) == (255, 0, 0)
 
 
 if __name__ == "__main__":
